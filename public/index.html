@@ -1108,7 +1108,13 @@ html, body {
 </div>
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
+// SUPABASE
+const sb = window.supabase.createClient(
+  'https://vxtypcnazxwbnojeqnhp.supabase.co',
+  'sb_publishable_Ortu4XcmR4Ytl6-HbFQCxg_Vt1wTP6L'
+);
 // STATE
 const S = {
   user: null,
@@ -1123,17 +1129,18 @@ const S = {
   theme: 'dark',
   chatHistory: [],
 };
-function save() {
-  localStorage.setItem('iv_user', JSON.stringify(S.user));
-  localStorage.setItem('iv_prefs', JSON.stringify(S.prefs));
-  localStorage.setItem('iv_portfolio', JSON.stringify(S.portfolio));
-  localStorage.setItem('iv_watchlist', JSON.stringify(S.watchlist));
+async function save() {
+  localStorage.setItem('iv_theme', S.theme);
+  if (!S.user || !S.user.id) return;
+  await sb.from('user_data').update({
+    name: S.user.name,
+    portfolio: S.portfolio,
+    watchlist: S.watchlist,
+    prefs: S.prefs,
+    updated_at: new Date().toISOString(),
+  }).eq('user_id', S.user.id);
 }
 function load() {
-  S.user = JSON.parse(localStorage.getItem('iv_user') || 'null');
-  S.prefs = JSON.parse(localStorage.getItem('iv_prefs') || '{"currency":"INR","market":"IN"}');
-  S.portfolio = JSON.parse(localStorage.getItem('iv_portfolio') || '[]');
-  S.watchlist = JSON.parse(localStorage.getItem('iv_watchlist') || '[]');
   S.cache = JSON.parse(localStorage.getItem('iv_cache') || '{}');
   S.theme = localStorage.getItem('iv_theme') || 'dark';
   document.documentElement.setAttribute('data-theme', S.theme);
@@ -1144,38 +1151,55 @@ function authTab(t) {
   document.getElementById('fp-login').classList.toggle('active', t==='login');
   document.getElementById('fp-reg').classList.toggle('active', t==='register');
 }
-function doLogin() {
+async function doLogin() {
   const email = document.getElementById('l-email').value.trim();
   const pass = document.getElementById('l-pass').value;
   if (!email || !pass) return toast('Fill in all fields', 'err');
-  const u = JSON.parse(localStorage.getItem('iv_user') || 'null');
-  if (!u || u.email !== email) return toast('Account not found — please register', 'err');
-  if (u.pass !== btoa(pass)) return toast('Incorrect password', 'err');
-  bootApp(u);
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if (error) return toast(error.message, 'err');
+  await bootApp(data.user);
 }
-function doRegister() {
+async function doRegister() {
   const name = document.getElementById('r-name').value.trim();
   const email = document.getElementById('r-email').value.trim();
   const pass = document.getElementById('r-pass').value;
   if (!name || !email || !pass) return toast('Fill in all fields', 'err');
   if (pass.length < 6) return toast('Password must be at least 6 characters', 'err');
-  const u = { name, email, pass: btoa(pass), isNew: true };
-  localStorage.setItem('iv_user', JSON.stringify(u));
-  bootApp(u);
+  const { data, error } = await sb.auth.signUp({ email, password: pass, options: { data: { name } } });
+  if (error) return toast(error.message, 'err');
+  if (!data.session) { return toast('Check your email to confirm your account', 'ok'); }
+  await bootApp(data.user, name);
 }
-function doGoogle() {
-  const u = { name: 'Akash Sharma', email: 'akash@gmail.com', pass: '', isNew: true };
-  localStorage.setItem('iv_user', JSON.stringify(u));
-  bootApp(u);
-  toast('Signed in with Google', 'ok');
+async function doGoogle() {
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.origin },
+  });
+  if (error) toast(error.message, 'err');
 }
-function bootApp(user) {
-  S.user = user;
-  S.portfolio = JSON.parse(localStorage.getItem('iv_portfolio') || '[]');
-  S.watchlist = JSON.parse(localStorage.getItem('iv_watchlist') || '[]');
-  S.prefs = JSON.parse(localStorage.getItem('iv_prefs') || '{"currency":"INR","market":"IN","onboarded":false}');
+async function bootApp(authUser, freshName) {
+  S.user = {
+    id: authUser.id,
+    email: authUser.email,
+    name: freshName || authUser.user_metadata?.name || authUser.user_metadata?.full_name || (authUser.email || '').split('@')[0],
+  };
+  let { data: row } = await sb.from('user_data').select('*').eq('user_id', authUser.id).maybeSingle();
+  if (!row) {
+    const { data: inserted } = await sb.from('user_data').insert({
+      user_id: authUser.id,
+      name: S.user.name,
+      portfolio: [],
+      watchlist: [],
+      prefs: { currency: 'INR', market: 'IN', onboarded: false },
+    }).select().single();
+    row = inserted;
+  }
+  if (row?.name) S.user.name = row.name;
+  S.portfolio = row?.portfolio || [];
+  S.watchlist = row?.watchlist || [];
+  S.prefs = row?.prefs || { currency: 'INR', market: 'IN', onboarded: false };
   document.getElementById('auth-wrap').style.display = 'none';
-  if (user.isNew && !S.prefs.onboarded) { showOnboarding(); } else { launchApp(); }
+  if (!S.prefs.onboarded) { showOnboarding(); } else { launchApp(); }
 }
 // ONBOARDING / PROFILE
 let profileMode = false;
@@ -1240,7 +1264,6 @@ function finishOnboarding() {
   if (profileMode) {
     const newName = document.getElementById('profile-name').value.trim();
     if (newName) S.user.name = newName;
-    localStorage.setItem('iv_user', JSON.stringify(S.user));
   }
   save();
   document.getElementById('onboarding').style.display = 'none';
@@ -2002,10 +2025,15 @@ function toast(msg, type = '') {
 }
 // INIT
 load();
-if (S.user) {
-  document.getElementById('auth-wrap').style.display = 'none';
-  bootApp(S.user);
-}
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session?.user) await bootApp(session.user);
+})();
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_IN' && session?.user && document.getElementById('auth-wrap').style.display !== 'none') {
+    bootApp(session.user);
+  }
+});
 </script>
 </body>
 </html>
