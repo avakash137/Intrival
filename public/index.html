@@ -992,9 +992,10 @@ html, body {
         <label>Email Address</label>
         <input type="text" id="profile-email" disabled/>
       </div>
-      <div class="market-info" style="margin-bottom:0;">
+      <div class="market-info" style="margin-bottom:20px;">
         Your email is linked to your sign-in and can't be changed here.
       </div>
+      <button class="btn-ghost" id="logout-btn" onclick="doLogout()" style="width:100%;border:1px solid var(--border);color:var(--loss);">Log Out</button>
     </div>
     <div id="ob-tab-prefs">
     <div class="section-label">Preferred Currency</div>
@@ -1249,6 +1250,17 @@ function profileTab(tab) {
 }
 function closeProfileModal() {
   document.getElementById('onboarding').style.display = 'none';
+}
+async function doLogout() {
+  await sb.auth.signOut();
+  S.user = null;
+  S.portfolio = [];
+  S.watchlist = [];
+  S.prefs = { currency: 'INR', market: 'IN', onboarded: false };
+  document.getElementById('onboarding').style.display = 'none';
+  document.getElementById('app').classList.remove('ready');
+  document.getElementById('auth-wrap').style.display = 'flex';
+  toast('Logged out', 'ok');
 }
 document.querySelectorAll('.currency-opt').forEach(opt => {
   opt.addEventListener('click', () => {
