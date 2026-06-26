@@ -833,6 +833,36 @@ html, body {
   .grid-4 { grid-template-columns: repeat(2,1fr); }
   .grid-3 { grid-template-columns: repeat(2,1fr); }
 }
+/* TICKER SEARCH DROPDOWN */
+.ticker-dd-wrap { position: relative; flex: 1; max-width: 360px; }
+.ticker-dd {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0; right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  z-index: 300;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.35);
+  display: none;
+  overflow: hidden;
+}
+.ticker-dd.open { display: block; }
+.dd-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+.dd-item:last-child { border-bottom: none; }
+.dd-item:hover { background: var(--surface2); }
+.dd-sym { font-family: var(--mono); font-weight: 600; font-size: 13px; color: var(--accent); min-width: 64px; }
+.dd-name { font-size: 12px; color: var(--text2); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dd-exch { font-size: 10px; color: var(--text3); white-space: nowrap; }
+.dd-empty { padding: 12px 14px; font-size: 12px; color: var(--text3); }
 </style>
 </head>
 <body>
@@ -1160,27 +1190,34 @@ function toggleTheme() {
   localStorage.setItem('iv_theme', S.theme);
 }
 // API HELPER — calls our backend proxy, never exposes the API key in the browser
-async function claude(prompt, systemPrompt = '') {
+async function claude(prompt, systemPrompt = '', maxTokens = 1400) {
   const messages = [{ role: 'user', content: prompt }];
-  const body = { model: 'claude-sonnet-4-6', max_tokens: 1000, messages };
+  const body = { model: 'claude-sonnet-4-6', max_tokens: maxTokens, messages };
   if (systemPrompt) body.system = systemPrompt;
-  const res = await fetch('/api/claude', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    console.error('API error:', err);
-    return '';
-  }
-  const d = await res.json();
-  return d.content?.[0]?.text || '';
+  try {
+    const res = await fetch('/api/claude', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) { console.error('API error:', res.status); return null; }
+    const d = await res.json();
+    return d.content?.[0]?.text || null;
+  } catch(e) { console.error('Claude fetch error:', e); return null; }
 }
 async function claudeJSON(prompt) {
-  const text = await claude(prompt + '\n\nReturn ONLY valid JSON, no markdown fences, no explanation.');
-  try { return JSON.parse(text.replace(/```json|```/g,'').trim()); }
-  catch { return null; }
+  const text = await claude(prompt + '\n\nReturn ONLY valid JSON. No markdown, no code fences, no explanation. Start your response with [ or {.');
+  if (!text) return null;
+  try {
+    const clean = text.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'').trim();
+    return JSON.parse(clean);
+  } catch(e) {
+    // Try extracting JSON from response if there's extra text
+    const match = text.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
+    if (match) { try { return JSON.parse(match[1]); } catch {} }
+    console.error('JSON parse error:', text.substring(0,200));
+    return null;
+  }
 }
 // TICKER DATA
 async function getTickerData(ticker) {
@@ -1215,10 +1252,14 @@ function renderPortfolioPage() {
   <p>AI-powered summaries, SEC filings, and AGM updates for your holdings</p>
 </div>
 <div class="input-row" style="margin-bottom:20px;">
-  <input class="inp" id="p-inp" placeholder="Add ticker — AAPL, TSLA, NVDA, GOOGL, MSFT…" style="max-width:360px;" onkeydown="if(event.key==='Enter')addToList('portfolio')"/>
-  <div style="display:flex;gap:6px;">
-    <button class="btn-accent" onclick="addToList('portfolio')">+ Add</button>
+  <div class="ticker-dd-wrap">
+    <input class="inp" id="p-inp" placeholder="Search by name or ticker — Apple, Tesla, NVDA…" style="width:100%;"
+      oninput="tickerSearch(this,'portfolio')"
+      onkeydown="if(event.key==='Enter'){event.preventDefault();addToList('portfolio');}"
+      onblur="setTimeout(()=>closeDD('p-dd'),150)"/>
+    <div class="ticker-dd" id="p-dd"></div>
   </div>
+  <button class="btn-accent" onclick="addToList('portfolio')">+ Add</button>
 </div>
 <div class="grid-auto" id="port-grid"></div>`;
 }
@@ -1230,7 +1271,13 @@ function renderWatchlistPage() {
   <p>Stocks you're monitoring — same intelligence features, no allocation tracked</p>
 </div>
 <div class="input-row" style="margin-bottom:20px;">
-  <input class="inp" id="w-inp" placeholder="Add ticker — TSLA, AMZN, META, NVDA, MSFT…" style="max-width:360px;" onkeydown="if(event.key==='Enter')addToList('watchlist')"/>
+  <div class="ticker-dd-wrap">
+    <input class="inp" id="w-inp" placeholder="Search by name or ticker — Amazon, Meta, NVDA…" style="width:100%;"
+      oninput="tickerSearch(this,'watchlist')"
+      onkeydown="if(event.key==='Enter'){event.preventDefault();addToList('watchlist');}"
+      onblur="setTimeout(()=>closeDD('w-dd'),150)"/>
+    <div class="ticker-dd" id="w-dd"></div>
+  </div>
   <button class="btn-accent" onclick="addToList('watchlist')">+ Add</button>
 </div>
 <div class="grid-auto" id="watch-grid"></div>`;
@@ -1289,12 +1336,56 @@ async function renderTickerGrid(listKey, gridId) {
     el('lo').textContent = data.weekLow52 ? `${sym}${data.weekLow52}` : '—';
   });
 }
+// TICKER SEARCH AUTOCOMPLETE
+let _ddTimer;
+async function tickerSearch(inp, listKey) {
+  const q = inp.value.trim();
+  const ddId = listKey === 'portfolio' ? 'p-dd' : 'w-dd';
+  const dd = document.getElementById(ddId);
+  if (!dd) return;
+  clearTimeout(_ddTimer);
+  if (q.length < 1) { dd.classList.remove('open'); return; }
+  _ddTimer = setTimeout(async () => {
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+      if (!res.ok) return;
+      const hits = await res.json();
+      if (!hits.length) {
+        dd.innerHTML = `<div class="dd-empty">No results found</div>`;
+        dd.classList.add('open');
+        return;
+      }
+      dd.innerHTML = hits.map(h =>
+        `<div class="dd-item" onmousedown="pickTicker('${h.symbol}','${listKey}')">
+          <span class="dd-sym">${h.symbol}</span>
+          <span class="dd-name">${(h.name||'').replace(/'/g,"&#39;")}</span>
+          <span class="dd-exch">${h.exchange||''}</span>
+        </div>`
+      ).join('');
+      dd.classList.add('open');
+    } catch(e) {}
+  }, 300);
+}
+function closeDD(ddId) {
+  const dd = document.getElementById(ddId);
+  if (dd) dd.classList.remove('open');
+}
+function pickTicker(sym, listKey) {
+  const inpId = listKey === 'portfolio' ? 'p-inp' : 'w-inp';
+  const ddId  = listKey === 'portfolio' ? 'p-dd'  : 'w-dd';
+  const inp = document.getElementById(inpId);
+  if (inp) inp.value = sym;
+  closeDD(ddId);
+  addToList(listKey);
+}
 function addToList(listKey) {
   const inpId = listKey === 'portfolio' ? 'p-inp' : 'w-inp';
+  const ddId  = listKey === 'portfolio' ? 'p-dd'  : 'w-dd';
   const inp = document.getElementById(inpId);
   if (!inp) return;
   const raw = inp.value.trim().toUpperCase();
   if (!raw) return;
+  closeDD(ddId);
   if (S[listKey].includes(raw)) return toast(`${raw} already in ${listKey}`, 'err');
   if (S[listKey].length >= 25) return toast('Limit: 25 stocks per list', 'err');
   S[listKey].push(raw);
@@ -1363,15 +1454,20 @@ async function renderPanelTab(tab) {
         <div class="ai-text" id="ai-sum"><div class="loading-row"><span class="spin"></span> Generating analysis for ${td.name||ticker}…</div></div>
       </div>`;
     const sumKey = `sum_${ticker}`;
-    let summary = S.cache[sumKey]?.text;
+    const sumCached = S.cache[sumKey];
+    let summary = (sumCached && Date.now() - sumCached.ts < 86400000) ? sumCached.text : null;
     if (!summary) {
-      const mktCtx = td.market === 'IN' ? 'NSE/BSE-listed Indian company' : 'NYSE/NASDAQ-listed US company';
-      summary = await claude(`You are a senior equity analyst. Write an investor intelligence briefing for ${td.name||ticker} (${ticker}), a ${mktCtx}. Cover: (1) recent performance & key drivers, (2) business fundamentals & competitive position, (3) key risks, (4) what to monitor next quarter. 4 short paragraphs, plain language, no bullet points.`);
-      S.cache[sumKey] = { text: summary, ts: Date.now() };
-      localStorage.setItem('iv_cache', JSON.stringify(S.cache));
+      summary = await claude(`You are a senior equity analyst. Write an investor intelligence briefing for ${td.name||ticker} (${ticker}), a NYSE/NASDAQ-listed US company. Cover: (1) recent performance and key drivers, (2) business fundamentals and competitive position, (3) key risks, (4) what to watch next quarter. Write 4 paragraphs. Plain prose, no bullet points, no headers.`);
+      if (summary) { S.cache[sumKey] = { text: summary, ts: Date.now() }; localStorage.setItem('iv_cache', JSON.stringify(S.cache)); }
     }
     const el = document.getElementById('ai-sum');
-    if (el) el.innerHTML = summary.split('\n\n').filter(p=>p.trim()).map(p=>`<p>${p}</p>`).join('');
+    if (el) {
+      if (!summary) {
+        el.innerHTML = '<p style="color:var(--text3);font-style:italic;">Analysis unavailable. Please try again in a moment.</p>';
+      } else {
+        el.innerHTML = summary.split('\n\n').filter(p=>p.trim()).map(p=>`<p>${p}</p>`).join('') || `<p>${summary}</p>`;
+      }
+    }
   }
   else if (tab === 'filings') {
     const filingBourse = td.market === 'IN' ? 'BSE/MCA filings' : 'SEC EDGAR filings';
@@ -1395,32 +1491,42 @@ async function renderPanelTab(tab) {
       ${docRow('PROXY', 'FY2024 Proxy / AGM Notice', 'Filed Mar 2024', ticker, 'proxy')}
       ${docRow('ANNUAL', 'Shareholder Letter 2024', 'Annual Report Filing', ticker, 'letter')}`;
     const agmKey = `agm_${ticker}`;
-    let agm = S.cache[agmKey]?.text;
+    const agmCached = S.cache[agmKey];
+    let agm = (agmCached && Date.now() - agmCached.ts < 86400000) ? agmCached.text : null;
     if (!agm) {
-      agm = await claude(`You are a governance analyst. Summarise the most recent AGM for ${td.name||ticker} (${ticker}). 3 paragraphs: (1) key resolutions & votes, (2) management strategic guidance, (3) shareholder concerns & board responses. Be specific. Plain paragraphs.`);
-      S.cache[agmKey] = { text: agm, ts: Date.now() };
-      localStorage.setItem('iv_cache', JSON.stringify(S.cache));
+      agm = await claude(`You are a governance analyst. Summarise the most recent Annual General Meeting for ${td.name||ticker} (${ticker}), a US listed company. Write 3 paragraphs covering: (1) key resolutions and vote outcomes, (2) management strategic guidance and outlook, (3) shareholder concerns and board responses. Be specific. Plain prose, no bullet points.`);
+      if (agm) { S.cache[agmKey] = { text: agm, ts: Date.now() }; localStorage.setItem('iv_cache', JSON.stringify(S.cache)); }
     }
     const el = document.getElementById('agm-sum');
-    if (el) el.innerHTML = agm.split('\n\n').filter(p=>p.trim()).map(p=>`<p>${p}</p>`).join('');
+    if (el) {
+      if (!agm) {
+        el.innerHTML = '<p style="color:var(--text3);font-style:italic;">AGM summary unavailable. Please try again in a moment.</p>';
+      } else {
+        el.innerHTML = agm.split('\n\n').filter(p=>p.trim()).map(p=>`<p>${p}</p>`).join('') || `<p>${agm}</p>`;
+      }
+    }
   }
   else if (tab === 'news') {
     body.innerHTML = `<p class="section-label">Latest News</p><div id="news-list"><div class="loading-row"><span class="spin"></span> Fetching news…</div></div>`;
     const newsKey = `news_${ticker}`;
-    let newsItems = S.cache[newsKey]?.data;
+    const newsCached = S.cache[newsKey];
+    let newsItems = (newsCached && Date.now() - newsCached.ts < 3600000) ? newsCached.data : null;
     if (!newsItems) {
-      newsItems = await claudeJSON(`Generate 6 realistic recent news items for ${td.name||ticker} (${ticker}). JSON array: [{"headline":"...","source":"Reuters","time":"2h ago","summary":"One sentence."}]`);
-      S.cache[newsKey] = { data: newsItems, ts: Date.now() };
-      localStorage.setItem('iv_cache', JSON.stringify(S.cache));
+      newsItems = await claudeJSON(`Generate 6 realistic recent news headlines for ${td.name||ticker} (${ticker}), a US public company. Return a JSON array with exactly 6 objects. Each object must have these exact keys: "headline", "source", "time", "summary". Example format: [{"headline":"Apple reports record Q3 revenue","source":"Reuters","time":"3h ago","summary":"Apple beat analyst expectations with $94B in quarterly revenue driven by iPhone sales."}]`);
+      if (newsItems) { S.cache[newsKey] = { data: newsItems, ts: Date.now() }; localStorage.setItem('iv_cache', JSON.stringify(S.cache)); }
     }
     const nl = document.getElementById('news-list');
-    if (nl && newsItems?.length) {
-      nl.innerHTML = newsItems.map(n=>`<div class="news-card">
-        <div class="news-src">${n.source}</div>
-        <div class="news-hl">${n.headline}</div>
-        <div class="news-meta">${n.time} · ${n.summary}</div>
-      </div>`).join('');
-    } else if (nl) nl.innerHTML = '<p class="muted small">No recent news available.</p>';
+    if (nl) {
+      if (newsItems?.length) {
+        nl.innerHTML = newsItems.map(n=>`<div class="news-card">
+          <div class="news-src">${n.source||'News'}</div>
+          <div class="news-hl">${n.headline||''}</div>
+          <div class="news-meta">${n.time||''} · ${n.summary||''}</div>
+        </div>`).join('');
+      } else {
+        nl.innerHTML = '<p style="color:var(--text3);padding:16px 0;">Unable to load news. Please try again.</p>';
+      }
+    }
   }
 }
 function docRow(type, title, date, ticker, ftype) {
@@ -1454,10 +1560,10 @@ async function showFilingSummary(ticker, type, title) {
   if (el) el.innerHTML = summary.split('\n\n').filter(p=>p.trim()).map(p=>`<p>${p}</p>`).join('');
 }
 function openSEC(ticker, type) {
-  const isIndian = S.cache[`td_${ticker}`]?.data?.market === 'IN';
-  const url = isIndian
-    ? `https://www.bseindia.com/stock-share-price/${ticker}/`
-    : `https://www.sec.gov/cgi-bin/browse-edgar?company=${ticker}&type=${encodeURIComponent(type)}&action=getcompany`;
+  // Normalise display type names → SEC filing types
+  const typeMap = { 'Annual Report': '10-K', 'ANNUAL': '10-K', 'Quarterly': '10-Q', '10-Q': '10-Q', '10-K': '10-K', 'PROXY': 'DEF 14A', 'ANNUAL': '10-K' };
+  const secType = typeMap[type] || '10-K';
+  const url = `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${encodeURIComponent(ticker)}&type=${encodeURIComponent(secType)}&dateb=&owner=include&count=10&search_text=`;
   window.open(url, '_blank');
 }
 // PAGE: MARKET PULSE
@@ -1659,27 +1765,12 @@ function renderCalendarPage() {
 }
 async function initCalendar() {
   const key = 'eco_cal';
-  let cal = S.cache[key]?.data;
+  const cached = S.cache[key];
+  // Expire calendar after 12 hours
+  let cal = (cached && Date.now() - cached.ts < 43200000) ? cached.data : null;
   if (!cal) {
-    cal = await claudeJSON(`Return economic calendar events for next 2 weeks. JSON:
-{
-  "india":[
-    {"date":"Dec 5","time":"10:00 IST","event":"RBI Monetary Policy Decision","impact":"high"},
-    {"date":"Dec 6","time":"12:00 IST","event":"India GDP Q2 FY25","impact":"high"},
-    {"date":"Dec 9","time":"11:30 IST","event":"India CPI Inflation","impact":"med"},
-    {"date":"Dec 11","time":"09:00 IST","event":"India WPI Data","impact":"low"},
-    {"date":"Dec 13","time":"11:00 IST","event":"India Industrial Output (IIP)","impact":"med"},
-    {"date":"Dec 16","time":"10:00 IST","event":"SEBI Board Meeting","impact":"med"}
-  ],
-  "global":[
-    {"date":"Dec 4","time":"20:30 IST","event":"US Non-Farm Payrolls","impact":"high"},
-    {"date":"Dec 5","time":"20:00 IST","event":"US ISM Services PMI","impact":"med"},
-    {"date":"Dec 11","time":"20:30 IST","event":"US CPI Inflation","impact":"high"},
-    {"date":"Dec 12","time":"00:00 IST","event":"US Federal Reserve Decision","impact":"high"},
-    {"date":"Dec 13","time":"15:30 IST","event":"ECB Rate Decision","impact":"med"},
-    {"date":"Dec 16","time":"20:30 IST","event":"US Retail Sales","impact":"med"}
-  ]
-}`);
+    const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    cal = await claudeJSON(`Today is ${today}. Generate a realistic US economic calendar for the next 2 weeks. Return a JSON object with two keys: "india" (array of 5 upcoming India macro events) and "global" (array of 6 upcoming US/global macro events). Each event object must have these exact keys: "date" (e.g. "Jun 28"), "time" (e.g. "2:00 PM ET"), "event" (event name), "impact" (must be exactly "high", "med", or "low"). Make the dates realistic and upcoming from today.`);
     if (cal) { S.cache[key] = { data: cal, ts: Date.now() }; localStorage.setItem('iv_cache', JSON.stringify(S.cache)); }
   }
   function renderEvents(events, containerId) {
