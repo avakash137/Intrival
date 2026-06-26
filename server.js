@@ -174,6 +174,7 @@ const server = http.createServer((req, res) => {
         return res.end(JSON.stringify({ error: `Symbol not found: ${rawSym}`, detail: data?.message || '' }));
       }
 
+
       const cur      = data.currency || 'USD';
       const exchange = data.exchange  || '';
       const indianEx = ['NSE', 'BSE', 'NSI', 'BOM'];
@@ -196,8 +197,8 @@ const server = http.createServer((req, res) => {
         price:         Math.round(price   * 100) / 100,
         change:        Math.round(change  * 100) / 100,
         changePercent: Math.round(chgPct  * 100) / 100,
-        marketCap:     null,       // not in Twelve Data free quote endpoint
-        peRatio:       null,       // not in Twelve Data free quote endpoint
+        marketCap:     null,       // not available without a paid fundamentals API — see note below
+        peRatio:       null,       // not available without a paid fundamentals API — see note below
         weekHigh52:    high52,
         weekLow52:     low52,
         volume:        fmtVol(data.volume),

@@ -1054,12 +1054,6 @@ html, body {
       <button class="nav-item active" onclick="goPage('portfolio')" data-page="portfolio">
         <span class="nav-icon">📊</span><span class="nav-label">Portfolio</span>
       </button>
-      <button class="nav-item" onclick="goPage('watchlist')" data-page="watchlist">
-        <span class="nav-icon">👁</span><span class="nav-label">Watchlist</span>
-      </button>
-      <button class="nav-item" onclick="goPage('currency')" data-page="currency">
-        <span class="nav-icon">💱</span><span class="nav-label">FX Converter</span>
-      </button>
     </div>
     <div class="sidebar-bottom">
       <div class="user-pill" onclick="showProfile()" style="cursor:pointer;">
@@ -1427,8 +1421,6 @@ async function renderTickerGrid(listKey, gridId) {
     <div class="tc-price" id="tc-${t}-price">—</div>
     <div id="tc-${t}-chg" class="tag-neu" style="display:inline-block;">—</div>
     <div class="tc-stats">
-      <div class="tc-stat"><div class="sl">Mkt Cap</div><div class="sv" id="tc-${t}-mcap">—</div></div>
-      <div class="tc-stat"><div class="sl">P/E</div><div class="sv" id="tc-${t}-pe">—</div></div>
       <div class="tc-stat"><div class="sl">52W Hi</div><div class="sv" id="tc-${t}-hi">—</div></div>
       <div class="tc-stat"><div class="sl">52W Lo</div><div class="sv" id="tc-${t}-lo">—</div></div>
     </div>
@@ -1455,8 +1447,6 @@ async function renderTickerGrid(listKey, gridId) {
     const sign = chg >= 0 ? '+' : '';
     el('chg').textContent = `${sign}${chg.toFixed(2)}%`;
     el('chg').className = chg > 0 ? 'tag-gain' : chg < 0 ? 'tag-loss' : 'tag-neu';
-    el('mcap').textContent = data.marketCap || '—';
-    el('pe').textContent = data.peRatio ? `${data.peRatio}x` : '—';
     el('hi').textContent = data.weekHigh52 ? `${sym}${data.weekHigh52}` : '—';
     el('lo').textContent = data.weekLow52 ? `${sym}${data.weekLow52}` : '—';
   });
@@ -1568,8 +1558,6 @@ async function renderPanelTab(tab) {
     body.innerHTML = `
       <div class="grid-3" style="margin-bottom:16px;">
         <div class="metric-box"><div class="mb-label">Price</div><div class="mb-val">${sym}${(td.price||0).toLocaleString()}</div><div class="mb-sub ${chg>=0?'gain-c':'loss-c'}">${sign}${chg.toFixed(2)}%</div></div>
-        <div class="metric-box"><div class="mb-label">Market Cap</div><div class="mb-val" style="font-size:15px;">${td.marketCap||'—'}</div></div>
-        <div class="metric-box"><div class="mb-label">P/E Ratio</div><div class="mb-val">${td.peRatio||'—'}</div></div>
         <div class="metric-box"><div class="mb-label">52W High</div><div class="mb-val">${td.weekHigh52?sym+td.weekHigh52:'—'}</div></div>
         <div class="metric-box"><div class="mb-label">52W Low</div><div class="mb-val">${td.weekLow52?sym+td.weekLow52:'—'}</div></div>
         <div class="metric-box"><div class="mb-label">Volume</div><div class="mb-val" style="font-size:15px;">${td.volume||'—'}</div></div>
