@@ -104,6 +104,132 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ── GET /api/quote/:symbol → Yahoo Finance proxy ──────────────────────
+  if (req.method === 'GET' && req.url.startsWith('/api/quote/')) {
+    const rawSym = decodeURIComponent(req.url.replace('/api/quote/', '').split('?')[0]).toUpperCase();
+
+    function yhFetch(symbol) {
+      return new Promise((resolve) => {
+        const yOpts = {
+          hostname: 'query1.finance.yahoo.com',
+          path: `/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=price%2CsummaryDetail`,
+          method: 'GET',
+          headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' },
+        };
+        const yReq = https.request(yOpts, yRes => {
+          let d = '';
+          yRes.on('data', c => (d += c));
+          yRes.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve(null); } });
+        });
+        yReq.on('error', () => resolve(null));
+        yReq.end();
+      });
+    }
+
+    function fmtMcap(val, cur) {
+      if (!val) return null;
+      if (cur === 'INR') {
+        if (val >= 1e12) return `₹${(val / 1e12).toFixed(2)}L Cr`;
+        if (val >= 1e9)  return `₹${(val / 1e9).toFixed(2)}K Cr`;
+        return `₹${(val / 1e7).toFixed(2)} Cr`;
+      }
+      if (val >= 1e12) return `$${(val / 1e12).toFixed(2)}T`;
+      if (val >= 1e9)  return `$${(val / 1e9).toFixed(2)}B`;
+      return `$${(val / 1e6).toFixed(2)}M`;
+    }
+
+    function fmtVol(val) {
+      if (!val) return null;
+      if (val >= 1e9) return `${(val / 1e9).toFixed(1)}B`;
+      if (val >= 1e6) return `${(val / 1e6).toFixed(1)}M`;
+      if (val >= 1e3) return `${(val / 1e3).toFixed(1)}K`;
+      return String(val);
+    }
+
+    (async () => {
+      // Try symbol as-is; if no result try appending .NS (Indian market)
+      let result = await yhFetch(rawSym);
+      let usedSym = rawSym;
+      if (!result?.quoteSummary?.result?.[0] && !rawSym.includes('.')) {
+        result = await yhFetch(rawSym + '.NS');
+        if (result?.quoteSummary?.result?.[0]) usedSym = rawSym + '.NS';
+      }
+
+      const summary = result?.quoteSummary?.result?.[0];
+      if (!summary) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: `Symbol not found: ${rawSym}` }));
+      }
+
+      const p  = summary.price         || {};
+      const sd = summary.summaryDetail || {};
+      const cur = p.currency || 'USD';
+      const indianExchanges = ['NSI', 'BSE', 'NSE', 'BOM'];
+      const market = indianExchanges.includes(p.exchange) || cur === 'INR' ? 'IN' : 'US';
+      const chgPct = (p.regularMarketChangePercent?.raw || 0) * 100;
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        symbol:        rawSym,
+        resolvedSymbol: usedSym,
+        name:          p.longName || p.shortName || rawSym,
+        currency:      cur,
+        market,
+        exchange:      p.exchange || '',
+        price:         p.regularMarketPrice?.raw        ?? 0,
+        change:        p.regularMarketChange?.raw       ?? 0,
+        changePercent: Math.round(chgPct * 100) / 100,
+        marketCap:     fmtMcap(p.marketCap?.raw, cur),
+        peRatio:       sd.trailingPE?.raw ? Math.round(sd.trailingPE.raw * 10) / 10 : null,
+        weekHigh52:    sd.fiftyTwoWeekHigh?.raw  || null,
+        weekLow52:     sd.fiftyTwoWeekLow?.raw   || null,
+        volume:        fmtVol(p.regularMarketVolume?.raw),
+        description:   null,
+      }));
+    })();
+    return;
+  }
+
+  // ── GET /api/search?q=query → Yahoo Finance symbol search ─────────────
+  if (req.method === 'GET' && req.url.startsWith('/api/search')) {
+    const qs = new URLSearchParams(req.url.split('?')[1] || '');
+    const q  = qs.get('q') || '';
+    if (!q) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ error: 'q param required' }));
+    }
+    const sOpts = {
+      hostname: 'query1.finance.yahoo.com',
+      path: `/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=8&newsCount=0`,
+      method: 'GET',
+      headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' },
+    };
+    const sReq = https.request(sOpts, sRes => {
+      let d = '';
+      sRes.on('data', c => (d += c));
+      sRes.on('end', () => {
+        try {
+          const parsed = JSON.parse(d);
+          const hits = (parsed.quotes || [])
+            .filter(q => q.quoteType === 'EQUITY')
+            .slice(0, 6)
+            .map(q => ({ symbol: q.symbol, name: q.longname || q.shortname || q.symbol, exchange: q.exchange }));
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(hits));
+        } catch {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Parse error' }));
+        }
+      });
+    });
+    sReq.on('error', err => {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message }));
+    });
+    sReq.end();
+    return;
+  }
+
   // ── Serve static files from ./public ──────────────────────────────────
   const urlPath = req.url.split('?')[0];
   const filePath = path.join(__dirname, 'public', urlPath === '/' ? 'index.html' : urlPath);

@@ -1186,31 +1186,21 @@ async function claudeJSON(prompt) {
 async function getTickerData(ticker) {
   const key = `td_${ticker}`;
   const cached = S.cache[key];
-  if (cached && Date.now() - cached.ts < 1800000) return cached.data;
-  const mktHint = ticker.endsWith('.NS') || ticker.endsWith('.BO') || isLikelyIndian(ticker)
-    ? 'NSE/BSE Indian market, prices in INR (₹)' : 'US market NYSE/NASDAQ, prices in USD ($)';
-  const data = await claudeJSON(`Return ticker data for "${ticker}" (${mktHint}). JSON format:
-{
-  "symbol":"${ticker}",
-  "name":"Company full name",
-  "sector":"Sector",
-  "market":"IN" or "US",
-  "currency":"INR" or "USD",
-  "price":1234.56,
-  "change":12.34,
-  "changePercent":1.02,
-  "marketCap":"₹2.1L Cr" or "$2.1T",
-  "peRatio":28.5,
-  "weekHigh52":1500,
-  "weekLow52":900,
-  "volume":"12.4M",
-  "description":"2-sentence company description"
-}`);
-  if (data) {
+  // Real market data — cache 5 minutes
+  if (cached && Date.now() - cached.ts < 300000) return cached.data;
+  try {
+    const res = await fetch(`/api/quote/${encodeURIComponent(ticker)}`);
+    if (!res.ok) {
+      // Symbol not found — return minimal stub so UI doesn't break
+      return { symbol: ticker, name: ticker, currency: 'USD', market: 'US', price: 0, error: true };
+    }
+    const data = await res.json();
     S.cache[key] = { data, ts: Date.now() };
     localStorage.setItem('iv_cache', JSON.stringify(S.cache));
+    return data;
+  } catch(e) {
+    return { symbol: ticker, name: ticker, currency: 'USD', market: 'US', price: 0, error: true };
   }
-  return data || { symbol: ticker, name: ticker, currency: 'USD', market: 'US', price: 0 };
 }
 function isLikelyIndian(sym) {
   const indianSyms = ['RELIANCE','TCS','INFY','WIPRO','HDFCBANK','ICICIBANK','SBIN','BAJFINANCE','RVNL','BEL','HAL','BEML','IRFC','NTPC','POWERGRID','COALINDIA','ONGC','LT','MARUTI','TITAN'];
