@@ -885,11 +885,18 @@ html, body {
     </div>
   </div>
 </div>
-<!-- ONBOARDING -->
+<!-- ONBOARDING / PROFILE -->
 <div class="modal-backdrop" id="onboarding" style="display:none;">
   <div class="modal-box">
-    <h2>Welcome to Intrival 👋</h2>
-    <p>Let's personalise your experience. Choose your preferred tracking currency and markets.</p>
+    <h2 id="ob-title">Welcome to Intrival 👋</h2>
+    <p id="ob-subtitle">Let's personalise your experience. Choose your preferred tracking currency and markets.</p>
+    <div class="section-label" id="ob-account-label" style="display:none;">Account</div>
+    <div class="fgroup" id="ob-account-fields" style="display:none;margin-bottom:20px;">
+      <label>Name</label>
+      <input type="text" id="profile-name" placeholder="Your name"/>
+      <label style="margin-top:10px;display:block;">Email</label>
+      <input type="text" id="profile-email" disabled/>
+    </div>
     <div class="section-label">Preferred Currency</div>
     <div class="currency-grid">
       <label class="currency-opt selected" id="copt-inr">
@@ -926,7 +933,7 @@ html, body {
         <option value="BOTH">Both</option>
       </select>
     </div>
-    <button class="btn-primary" onclick="finishOnboarding()">Get Started →</button>
+    <button class="btn-primary" id="ob-submit-btn" onclick="finishOnboarding()">Get Started →</button>
   </div>
 </div>
 <!-- APP SHELL -->
@@ -964,7 +971,7 @@ html, body {
       </button>
     </div>
     <div class="sidebar-bottom">
-      <div class="user-pill">
+      <div class="user-pill" onclick="showProfile()" style="cursor:pointer;">
         <div class="avatar" id="sb-avatar">A</div>
         <div class="user-info">
           <div class="user-name" id="sb-name">User</div>
@@ -986,8 +993,7 @@ html, body {
     <div class="topbar">
       <div class="topbar-title" id="topbar-title">Portfolio</div>
       <div class="topbar-right">
-        <div class="currency-badge" onclick="showOnboarding()" id="curr-badge">₹ INR</div>
-        <div class="avatar" id="top-avatar" style="width:34px;height:34px;font-size:13px;">A</div>
+        <div class="avatar" id="top-avatar" onclick="showProfile()" style="width:34px;height:34px;font-size:13px;cursor:pointer;">A</div>
       </div>
     </div>
     <div class="page-content" id="page-root"></div>
@@ -1086,8 +1092,37 @@ function bootApp(user) {
   document.getElementById('auth-wrap').style.display = 'none';
   if (user.isNew && !S.prefs.onboarded) { showOnboarding(); } else { launchApp(); }
 }
-// ONBOARDING
-function showOnboarding() { document.getElementById('onboarding').style.display = 'flex'; }
+// ONBOARDING / PROFILE
+let profileMode = false;
+function selectCurrencyOpt(value) {
+  document.querySelectorAll('.currency-opt').forEach(o => o.classList.remove('selected'));
+  const map = { INR: 'copt-inr', USD: 'copt-usd', BOTH: 'copt-both' };
+  const opt = document.getElementById(map[value] || 'copt-inr');
+  opt.classList.add('selected');
+  opt.querySelector('input').checked = true;
+}
+function showOnboarding() {
+  profileMode = false;
+  document.getElementById('ob-title').textContent = 'Welcome to Intrival 👋';
+  document.getElementById('ob-subtitle').textContent = "Let's personalise your experience. Choose your preferred tracking currency and markets.";
+  document.getElementById('ob-account-label').style.display = 'none';
+  document.getElementById('ob-account-fields').style.display = 'none';
+  document.getElementById('ob-submit-btn').textContent = 'Get Started →';
+  document.getElementById('onboarding').style.display = 'flex';
+}
+function showProfile() {
+  profileMode = true;
+  document.getElementById('ob-title').textContent = 'Your Profile';
+  document.getElementById('ob-subtitle').textContent = 'Manage your account details and tracking preferences.';
+  document.getElementById('ob-account-label').style.display = 'block';
+  document.getElementById('ob-account-fields').style.display = 'block';
+  document.getElementById('profile-name').value = S.user.name || '';
+  document.getElementById('profile-email').value = S.user.email || '';
+  selectCurrencyOpt(S.prefs.currency || 'INR');
+  document.getElementById('home-market').value = S.prefs.market || 'IN';
+  document.getElementById('ob-submit-btn').textContent = 'Save Changes';
+  document.getElementById('onboarding').style.display = 'flex';
+}
 document.querySelectorAll('.currency-opt').forEach(opt => {
   opt.addEventListener('click', () => {
     document.querySelectorAll('.currency-opt').forEach(o => o.classList.remove('selected'));
@@ -1099,9 +1134,23 @@ function finishOnboarding() {
   const curr = document.querySelector('input[name="curr"]:checked')?.value || 'INR';
   const mkt = document.getElementById('home-market').value;
   S.prefs = { currency: curr, market: mkt, onboarded: true };
+  if (profileMode) {
+    const newName = document.getElementById('profile-name').value.trim();
+    if (newName) S.user.name = newName;
+    localStorage.setItem('iv_user', JSON.stringify(S.user));
+  }
   save();
   document.getElementById('onboarding').style.display = 'none';
-  launchApp();
+  if (profileMode) {
+    const initials = S.user.name.split(' ').map(p=>p[0]).join('').substring(0,2).toUpperCase();
+    document.getElementById('sb-avatar').textContent = initials;
+    document.getElementById('sb-name').textContent = S.user.name;
+    document.getElementById('top-avatar').textContent = initials;
+    updateCurrBadge();
+    toast('Profile updated', 'ok');
+  } else {
+    launchApp();
+  }
 }
 // APP LAUNCH
 function launchApp() {
@@ -1118,7 +1167,6 @@ function updateCurrBadge() {
   const m = S.prefs.market;
   const sym = c === 'INR' ? '₹ INR' : c === 'USD' ? '$ USD' : '₹+$';
   const mkt = m === 'IN' ? 'India' : m === 'US' ? 'US' : 'IN+US';
-  document.getElementById('curr-badge').textContent = `${sym} · ${mkt}`;
   document.getElementById('sb-meta').textContent = `${sym} · ${mkt}`;
 }
 // NAVIGATION

@@ -260,7 +260,53 @@ html, body {
   padding: 40px;
   width: 100%; max-width: 480px;
   box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+  position: relative;
 }
+.modal-close {
+  position: absolute; top: 18px; right: 18px;
+  width: 30px; height: 30px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--text2);
+  font-size: 13px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.2s, color 0.2s;
+}
+.modal-close:hover { color: var(--text); border-color: var(--accent); }
+.profile-header {
+  display: flex; align-items: center; gap: 14px;
+  margin-bottom: 24px; padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.profile-avatar { width: 52px; height: 52px; font-size: 18px; flex-shrink: 0; }
+.profile-header-name {
+  font-family: var(--dm);
+  font-size: 16px; font-weight: 700;
+}
+.profile-header-email { font-size: 12px; color: var(--text2); margin-top: 2px; }
+.modal-tabs {
+  display: flex; gap: 4px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  margin-bottom: 26px;
+}
+.modal-tab {
+  flex: 1;
+  background: none; border: none;
+  padding: 9px 0;
+  border-radius: 6px;
+  color: var(--text2);
+  font-family: var(--inter);
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.modal-tab.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,0.25); }
+.modal-tab:hover:not(.active) { color: var(--text); }
 .modal-box h2 {
   font-family: var(--dm);
   font-size: 20px;
@@ -871,7 +917,12 @@ html, body {
   <div class="auth-glow"></div>
   <div class="auth-card">
     <div class="auth-logo">
-      <div class="logo-mark">I</div>
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24" width="62%" height="62%" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 16.5 L9 10.5 L13 14.5 L21 5.5"/>
+          <path d="M15.5 5.5 L21 5.5 L21 11"/>
+        </svg>
+      </div>
       <div class="logo-text">intri<em>val</em></div>
     </div>
     <p class="auth-sub">Your complete investor intelligence platform. Portfolio tracking, SEC filings, market data, AI research — all in one place.</p>
@@ -915,11 +966,37 @@ html, body {
     </div>
   </div>
 </div>
-<!-- ONBOARDING -->
+<!-- ONBOARDING / PROFILE -->
 <div class="modal-backdrop" id="onboarding" style="display:none;">
   <div class="modal-box">
-    <h2>Welcome to Intrival 👋</h2>
-    <p>Let's personalise your experience. Choose your preferred tracking currency and markets.</p>
+    <button class="modal-close" id="ob-close-btn" onclick="closeProfileModal()" style="display:none;">✕</button>
+    <div class="profile-header" id="ob-profile-header" style="display:none;">
+      <div class="avatar profile-avatar" id="profile-avatar">A</div>
+      <div>
+        <div class="profile-header-name" id="profile-header-name">—</div>
+        <div class="profile-header-email" id="profile-header-email">—</div>
+      </div>
+    </div>
+    <h2 id="ob-title">Welcome to Intrival 👋</h2>
+    <p id="ob-subtitle">Let's personalise your experience. Choose your preferred tracking currency and markets.</p>
+    <div class="modal-tabs" id="ob-tabs" style="display:none;">
+      <button class="modal-tab active" id="ob-tab-btn-account" onclick="profileTab('account')">Account</button>
+      <button class="modal-tab" id="ob-tab-btn-prefs" onclick="profileTab('prefs')">Preferences</button>
+    </div>
+    <div id="ob-tab-account" style="display:none;">
+      <div class="fgroup" style="margin-bottom:10px;">
+        <label>Full Name</label>
+        <input type="text" id="profile-name" placeholder="Your name"/>
+      </div>
+      <div class="fgroup" style="margin-bottom:20px;">
+        <label>Email Address</label>
+        <input type="text" id="profile-email" disabled/>
+      </div>
+      <div class="market-info" style="margin-bottom:0;">
+        Your email is linked to your sign-in and can't be changed here.
+      </div>
+    </div>
+    <div id="ob-tab-prefs">
     <div class="section-label">Preferred Currency</div>
     <div class="currency-grid">
       <label class="currency-opt selected" id="copt-inr">
@@ -956,14 +1033,20 @@ html, body {
         <option value="BOTH">Both</option>
       </select>
     </div>
-    <button class="btn-primary" onclick="finishOnboarding()">Get Started →</button>
+    </div>
+    <button class="btn-primary" id="ob-submit-btn" onclick="finishOnboarding()">Get Started →</button>
   </div>
 </div>
 <!-- APP SHELL -->
 <div id="app">
   <nav class="sidebar" id="sidebar">
     <div class="sidebar-logo">
-      <div class="logo-mark">I</div>
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24" width="62%" height="62%" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 16.5 L9 10.5 L13 14.5 L21 5.5"/>
+          <path d="M15.5 5.5 L21 5.5 L21 11"/>
+        </svg>
+      </div>
       <div class="logo-text">intri<em style="color:var(--accent);font-style:normal;">val</em></div>
     </div>
     <div class="nav-section">
@@ -974,31 +1057,16 @@ html, body {
       <button class="nav-item" onclick="goPage('watchlist')" data-page="watchlist">
         <span class="nav-icon">👁</span><span class="nav-label">Watchlist</span>
       </button>
-      <button class="nav-item" onclick="goPage('market')" data-page="market">
-        <span class="nav-icon">🌐</span><span class="nav-label">Market Pulse</span>
-      </button>
-      <button class="nav-item" onclick="goPage('screener')" data-page="screener">
-        <span class="nav-icon">🔍</span><span class="nav-label">Screener</span>
-      </button>
-    </div>
-    <div class="nav-section">
-      <div class="nav-section-label">Intelligence</div>
-      <button class="nav-item" onclick="goPage('research')" data-page="research">
-        <span class="nav-icon">🤖</span><span class="nav-label">AI Research</span>
-      </button>
-      <button class="nav-item" onclick="goPage('calendar')" data-page="calendar">
-        <span class="nav-icon">📅</span><span class="nav-label">Eco. Calendar</span>
-      </button>
       <button class="nav-item" onclick="goPage('currency')" data-page="currency">
         <span class="nav-icon">💱</span><span class="nav-label">FX Converter</span>
       </button>
     </div>
     <div class="sidebar-bottom">
-      <div class="user-pill">
+      <div class="user-pill" onclick="showProfile()" style="cursor:pointer;">
         <div class="avatar" id="sb-avatar">A</div>
         <div class="user-info">
           <div class="user-name" id="sb-name">User</div>
-          <div class="user-meta" id="sb-meta">₹ INR · India</div>
+          <div class="user-meta" id="sb-meta">India</div>
         </div>
       </div>
       <button class="theme-toggle" onclick="toggleTheme()">
@@ -1016,8 +1084,7 @@ html, body {
     <div class="topbar">
       <div class="topbar-title" id="topbar-title">Portfolio</div>
       <div class="topbar-right">
-        <div class="currency-badge" onclick="showOnboarding()" id="curr-badge">₹ INR</div>
-        <div class="avatar" id="top-avatar" style="width:34px;height:34px;font-size:13px;">A</div>
+        <div class="avatar" id="top-avatar" onclick="showProfile()" style="width:34px;height:34px;font-size:13px;cursor:pointer;">A</div>
       </div>
     </div>
     <div class="page-content" id="page-root"></div>
@@ -1116,8 +1183,55 @@ function bootApp(user) {
   document.getElementById('auth-wrap').style.display = 'none';
   if (user.isNew && !S.prefs.onboarded) { showOnboarding(); } else { launchApp(); }
 }
-// ONBOARDING
-function showOnboarding() { document.getElementById('onboarding').style.display = 'flex'; }
+// ONBOARDING / PROFILE
+let profileMode = false;
+function selectCurrencyOpt(value) {
+  document.querySelectorAll('.currency-opt').forEach(o => o.classList.remove('selected'));
+  const map = { INR: 'copt-inr', USD: 'copt-usd', BOTH: 'copt-both' };
+  const opt = document.getElementById(map[value] || 'copt-inr');
+  opt.classList.add('selected');
+  opt.querySelector('input').checked = true;
+}
+function showOnboarding() {
+  profileMode = false;
+  document.getElementById('ob-title').textContent = 'Welcome to Intrival 👋';
+  document.getElementById('ob-subtitle').textContent = "Let's personalise your experience. Choose your preferred tracking currency and markets.";
+  document.getElementById('ob-close-btn').style.display = 'none';
+  document.getElementById('ob-profile-header').style.display = 'none';
+  document.getElementById('ob-tabs').style.display = 'none';
+  document.getElementById('ob-tab-account').style.display = 'none';
+  document.getElementById('ob-tab-prefs').style.display = 'block';
+  document.getElementById('ob-submit-btn').textContent = 'Get Started →';
+  document.getElementById('onboarding').style.display = 'flex';
+}
+function showProfile() {
+  profileMode = true;
+  document.getElementById('ob-title').textContent = 'Your Profile';
+  document.getElementById('ob-subtitle').textContent = 'Manage your account details and tracking preferences.';
+  document.getElementById('ob-close-btn').style.display = 'flex';
+  document.getElementById('ob-profile-header').style.display = 'flex';
+  document.getElementById('ob-tabs').style.display = 'flex';
+  const initials = S.user.name.split(' ').map(p=>p[0]).join('').substring(0,2).toUpperCase();
+  document.getElementById('profile-avatar').textContent = initials;
+  document.getElementById('profile-header-name').textContent = S.user.name || '';
+  document.getElementById('profile-header-email').textContent = S.user.email || '';
+  document.getElementById('profile-name').value = S.user.name || '';
+  document.getElementById('profile-email').value = S.user.email || '';
+  selectCurrencyOpt(S.prefs.currency || 'INR');
+  document.getElementById('home-market').value = S.prefs.market || 'IN';
+  document.getElementById('ob-submit-btn').textContent = 'Save Changes';
+  profileTab('account');
+  document.getElementById('onboarding').style.display = 'flex';
+}
+function profileTab(tab) {
+  document.getElementById('ob-tab-btn-account').classList.toggle('active', tab === 'account');
+  document.getElementById('ob-tab-btn-prefs').classList.toggle('active', tab === 'prefs');
+  document.getElementById('ob-tab-account').style.display = tab === 'account' ? 'block' : 'none';
+  document.getElementById('ob-tab-prefs').style.display = tab === 'prefs' ? 'block' : 'none';
+}
+function closeProfileModal() {
+  document.getElementById('onboarding').style.display = 'none';
+}
 document.querySelectorAll('.currency-opt').forEach(opt => {
   opt.addEventListener('click', () => {
     document.querySelectorAll('.currency-opt').forEach(o => o.classList.remove('selected'));
@@ -1129,9 +1243,23 @@ function finishOnboarding() {
   const curr = document.querySelector('input[name="curr"]:checked')?.value || 'INR';
   const mkt = document.getElementById('home-market').value;
   S.prefs = { currency: curr, market: mkt, onboarded: true };
+  if (profileMode) {
+    const newName = document.getElementById('profile-name').value.trim();
+    if (newName) S.user.name = newName;
+    localStorage.setItem('iv_user', JSON.stringify(S.user));
+  }
   save();
   document.getElementById('onboarding').style.display = 'none';
-  launchApp();
+  if (profileMode) {
+    const initials = S.user.name.split(' ').map(p=>p[0]).join('').substring(0,2).toUpperCase();
+    document.getElementById('sb-avatar').textContent = initials;
+    document.getElementById('sb-name').textContent = S.user.name;
+    document.getElementById('top-avatar').textContent = initials;
+    updateCurrBadge();
+    toast('Profile updated', 'ok');
+  } else {
+    launchApp();
+  }
 }
 // APP LAUNCH
 function launchApp() {
@@ -1144,12 +1272,9 @@ function launchApp() {
   goPage('portfolio');
 }
 function updateCurrBadge() {
-  const c = S.prefs.currency;
   const m = S.prefs.market;
-  const sym = c === 'INR' ? '₹ INR' : c === 'USD' ? '$ USD' : '₹+$';
-  const mkt = m === 'IN' ? 'India' : m === 'US' ? 'US' : 'IN+US';
-  document.getElementById('curr-badge').textContent = `${sym} · ${mkt}`;
-  document.getElementById('sb-meta').textContent = `${sym} · ${mkt}`;
+  const mkt = m === 'IN' ? 'India' : m === 'US' ? 'US' : 'India + US';
+  document.getElementById('sb-meta').textContent = mkt;
 }
 // NAVIGATION
 const PAGE_TITLES = {
