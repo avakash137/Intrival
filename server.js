@@ -228,7 +228,7 @@ const server = http.createServer((req, res) => {
         try {
           const parsed = JSON.parse(d);
           const hits = (parsed.quotes || [])
-            .filter(q => q.quoteType === 'EQUITY')
+            .filter(q => q.quoteType === 'EQUITY' && !q.symbol.endsWith('.NS') && !q.symbol.endsWith('.BO'))
             .slice(0, 6)
             .map(q => ({ symbol: q.symbol, name: q.longname || q.shortname || q.symbol, exchange: q.exchange }));
           res.writeHead(200, { 'Content-Type': 'application/json' });

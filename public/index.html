@@ -1215,13 +1215,8 @@ function renderPortfolioPage() {
   <p>AI-powered summaries, SEC filings, and AGM updates for your holdings</p>
 </div>
 <div class="input-row" style="margin-bottom:20px;">
-  <input class="inp" id="p-inp" placeholder="Add ticker — AAPL, RELIANCE, TCS, NVDA, BEL…" style="max-width:360px;" onkeydown="if(event.key==='Enter')addToList('portfolio')"/>
+  <input class="inp" id="p-inp" placeholder="Add ticker — AAPL, TSLA, NVDA, GOOGL, MSFT…" style="max-width:360px;" onkeydown="if(event.key==='Enter')addToList('portfolio')"/>
   <div style="display:flex;gap:6px;">
-    <select class="filter-sel" id="p-mkt">
-      <option value="auto">Auto-detect market</option>
-      <option value="US">🇺🇸 US Market</option>
-      <option value="IN">🇮🇳 Indian Market</option>
-    </select>
     <button class="btn-accent" onclick="addToList('portfolio')">+ Add</button>
   </div>
 </div>
@@ -1235,7 +1230,7 @@ function renderWatchlistPage() {
   <p>Stocks you're monitoring — same intelligence features, no allocation tracked</p>
 </div>
 <div class="input-row" style="margin-bottom:20px;">
-  <input class="inp" id="w-inp" placeholder="Add ticker — TSLA, ZOMATO, IRFC, GOOGL…" style="max-width:360px;" onkeydown="if(event.key==='Enter')addToList('watchlist')"/>
+  <input class="inp" id="w-inp" placeholder="Add ticker — TSLA, AMZN, META, NVDA, MSFT…" style="max-width:360px;" onkeydown="if(event.key==='Enter')addToList('watchlist')"/>
   <button class="btn-accent" onclick="addToList('watchlist')">+ Add</button>
 </div>
 <div class="grid-auto" id="watch-grid"></div>`;
@@ -1533,8 +1528,6 @@ function renderScreenerPage() {
 <div class="page-head"><h1>Stock Screener</h1><p>Filter Indian &amp; US stocks by fundamental criteria</p></div>
 <div class="filter-bar">
   <select class="filter-sel" id="sc-market" onchange="runScreener()">
-    <option value="both">🌐 All Markets</option>
-    <option value="IN">🇮🇳 India (NSE/BSE)</option>
     <option value="US">🇺🇸 US (NYSE/NASDAQ)</option>
   </select>
   <select class="filter-sel" id="sc-sector" onchange="runScreener()">
@@ -1575,9 +1568,9 @@ async function runScreener() {
   const cacheKey = `screen_${market}_${sector}_${pe}`;
   let stocks = S.cache[cacheKey]?.data;
   if (!stocks) {
-    stocks = await claudeJSON(`Return 12 stocks for a stock screener with filters: market="${market}", sector="${sector||'any'}", pe="${pe||'any'}". Mix Indian and US stocks when market=both. JSON array:
+    stocks = await claudeJSON(`Return 12 US stocks for a stock screener with filters: sector="${sector||'any'}", pe="${pe||'any'}". All stocks must be NYSE/NASDAQ listed. JSON array:
 [{"symbol":"AAPL","name":"Apple Inc","market":"US","sector":"Technology","price":189.50,"change":1.2,"changePercent":0.64,"marketCap":"$2.9T","peRatio":29.5}]
-Include realistic INR prices for Indian stocks (₹ prefix in marketCap) and USD for US. Return 12 items.`);
+Use realistic USD prices and market caps. Return exactly 12 items.`);
     if (stocks) { S.cache[cacheKey] = { data: stocks, ts: Date.now() }; localStorage.setItem('iv_cache', JSON.stringify(S.cache)); }
   }
   if (!stocks?.length) {
@@ -1609,7 +1602,7 @@ function addFromScreener(sym, market) {
 }
 // PAGE: AI RESEARCH CHAT
 function renderResearchPage() {
-  const starters = ['Analyse RVNL for a 2-year horizon', 'Compare INFY vs TCS fundamentals', 'What are key risks in the Indian PSU defence sector?', 'Explain the SEBI FII/FPI flow impact on Nifty'];
+  const starters = ['Analyse NVDA for a 2-year horizon', 'Compare AAPL vs MSFT fundamentals', 'What are key risks in the US semiconductor sector?', 'Explain the Fed rate impact on growth stocks'];
   return `
 <div class="page-head"><h1>AI Research</h1><p>Ask anything about any stock, sector, or market — Indian or global</p></div>
 <div class="chat-wrap">
@@ -1642,7 +1635,7 @@ async function sendChat() {
   msgs.innerHTML += `<div class="msg-ai" id="ai-thinking"><div class="msg-avatar">🤖</div><div class="msg-bubble"><div class="loading-row"><span class="spin"></span> Researching…</div></div></div>`;
   msgs.scrollTop = msgs.scrollHeight;
   S.chatHistory.push({ role: 'user', content: msg });
-  const systemCtx = `You are a senior equity research analyst specialising in both Indian markets (NSE/BSE) and US markets. User's preferred currency: ${S.prefs.currency}. Portfolio: ${S.portfolio.join(', ')||'none added yet'}. Be analytical, specific, and concise. Use paragraph format.`;
+  const systemCtx = `You are a senior equity research analyst specialising in US markets (NYSE/NASDAQ). User's preferred currency: USD. Portfolio: ${S.portfolio.join(', ')||'none added yet'}. Be analytical, specific, and concise. Use paragraph format.`;
   const res = await fetch('/api/claude', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
