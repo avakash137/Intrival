@@ -24,6 +24,7 @@ loadEnv();
 
 const PORT = process.env.PORT || 3000;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const TWELVE_DATA_KEY   = process.env.TWELVE_DATA_KEY;
 
 if (!ANTHROPIC_API_KEY || ANTHROPIC_API_KEY === 'PASTE_YOUR_KEY_HERE' || ANTHROPIC_API_KEY === 'sk-ant-your-key-here') {
   console.error('\n❌  Missing API key. Open .env and set ANTHROPIC_API_KEY=sk-ant-...\n');
@@ -104,86 +105,102 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // ── GET /api/quote/:symbol → Yahoo Finance proxy ──────────────────────
+  // ── GET /api/quote/:symbol → Twelve Data proxy ───────────────────────
   if (req.method === 'GET' && req.url.startsWith('/api/quote/')) {
     const rawSym = decodeURIComponent(req.url.replace('/api/quote/', '').split('?')[0]).toUpperCase();
 
-    function yhFetch(symbol) {
+    if (!TWELVE_DATA_KEY) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ error: 'TWELVE_DATA_KEY not configured' }));
+    }
+
+    // Twelve Data uses SYMBOL:EXCHANGE notation for NSE stocks (e.g. RELIANCE:NSE)
+    // If user typed a Yahoo-style symbol like RELIANCE.NS, normalise it
+    const tdSymbol = rawSym.replace(/\.NS$/i, ':NSE').replace(/\.BO$/i, ':BSE');
+
+    function tdFetch(sym) {
       return new Promise((resolve) => {
-        const yOpts = {
-          hostname: 'query1.finance.yahoo.com',
-          path: `/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=price%2CsummaryDetail`,
+        const opts = {
+          hostname: 'api.twelvedata.com',
+          path: `/quote?symbol=${encodeURIComponent(sym)}&apikey=${TWELVE_DATA_KEY}`,
           method: 'GET',
-          headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' },
+          headers: { 'User-Agent': 'Intrival/1.0', 'Accept': 'application/json' },
         };
-        const yReq = https.request(yOpts, yRes => {
+        const req2 = https.request(opts, r => {
           let d = '';
-          yRes.on('data', c => (d += c));
-          yRes.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve(null); } });
+          r.on('data', c => (d += c));
+          r.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve(null); } });
         });
-        yReq.on('error', () => resolve(null));
-        yReq.end();
+        req2.on('error', () => resolve(null));
+        req2.end();
       });
     }
 
     function fmtMcap(val, cur) {
       if (!val) return null;
+      const n = parseFloat(val);
+      if (isNaN(n)) return null;
       if (cur === 'INR') {
-        if (val >= 1e12) return `₹${(val / 1e12).toFixed(2)}L Cr`;
-        if (val >= 1e9)  return `₹${(val / 1e9).toFixed(2)}K Cr`;
-        return `₹${(val / 1e7).toFixed(2)} Cr`;
+        if (n >= 1e12) return `₹${(n / 1e12).toFixed(2)}L Cr`;
+        if (n >= 1e9)  return `₹${(n / 1e9).toFixed(2)}K Cr`;
+        return `₹${(n / 1e7).toFixed(2)} Cr`;
       }
-      if (val >= 1e12) return `$${(val / 1e12).toFixed(2)}T`;
-      if (val >= 1e9)  return `$${(val / 1e9).toFixed(2)}B`;
-      return `$${(val / 1e6).toFixed(2)}M`;
+      if (n >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
+      if (n >= 1e9)  return `$${(n / 1e9).toFixed(2)}B`;
+      return `$${(n / 1e6).toFixed(2)}M`;
     }
 
     function fmtVol(val) {
       if (!val) return null;
-      if (val >= 1e9) return `${(val / 1e9).toFixed(1)}B`;
-      if (val >= 1e6) return `${(val / 1e6).toFixed(1)}M`;
-      if (val >= 1e3) return `${(val / 1e3).toFixed(1)}K`;
-      return String(val);
+      const n = parseFloat(val);
+      if (isNaN(n)) return null;
+      if (n >= 1e9) return `${(n / 1e9).toFixed(1)}B`;
+      if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
+      if (n >= 1e3) return `${(n / 1e3).toFixed(1)}K`;
+      return String(n);
     }
 
     (async () => {
-      // Try symbol as-is; if no result try appending .NS (Indian market)
-      let result = await yhFetch(rawSym);
-      let usedSym = rawSym;
-      if (!result?.quoteSummary?.result?.[0] && !rawSym.includes('.')) {
-        result = await yhFetch(rawSym + '.NS');
-        if (result?.quoteSummary?.result?.[0]) usedSym = rawSym + '.NS';
+      let data = await tdFetch(tdSymbol);
+
+      // If not found and no exchange suffix, also try without suffix (pure US symbol)
+      if (data?.status === 'error' && tdSymbol.includes(':')) {
+        const baseSym = tdSymbol.split(':')[0];
+        data = await tdFetch(baseSym);
       }
 
-      const summary = result?.quoteSummary?.result?.[0];
-      if (!summary) {
+      if (!data || data.status === 'error' || !data.close) {
         res.writeHead(404, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({ error: `Symbol not found: ${rawSym}` }));
+        return res.end(JSON.stringify({ error: `Symbol not found: ${rawSym}`, detail: data?.message || '' }));
       }
 
-      const p  = summary.price         || {};
-      const sd = summary.summaryDetail || {};
-      const cur = p.currency || 'USD';
-      const indianExchanges = ['NSI', 'BSE', 'NSE', 'BOM'];
-      const market = indianExchanges.includes(p.exchange) || cur === 'INR' ? 'IN' : 'US';
-      const chgPct = (p.regularMarketChangePercent?.raw || 0) * 100;
+      const cur      = data.currency || 'USD';
+      const exchange = data.exchange  || '';
+      const indianEx = ['NSE', 'BSE', 'NSI', 'BOM'];
+      const market   = indianEx.some(e => exchange.toUpperCase().includes(e)) || cur === 'INR' ? 'IN' : 'US';
+
+      const price     = parseFloat(data.close)          || 0;
+      const change    = parseFloat(data.change)         || 0;
+      const chgPct    = parseFloat(data.percent_change) || 0;
+      const high52    = parseFloat(data.fifty_two_week?.high)  || null;
+      const low52     = parseFloat(data.fifty_two_week?.low)   || null;
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         symbol:        rawSym,
-        resolvedSymbol: usedSym,
-        name:          p.longName || p.shortName || rawSym,
+        resolvedSymbol: data.symbol || rawSym,
+        name:          data.name   || rawSym,
         currency:      cur,
         market,
-        exchange:      p.exchange || '',
-        price:         p.regularMarketPrice?.raw        ?? 0,
-        change:        p.regularMarketChange?.raw       ?? 0,
-        changePercent: Math.round(chgPct * 100) / 100,
-        marketCap:     fmtMcap(p.marketCap?.raw, cur),
-        peRatio:       sd.trailingPE?.raw ? Math.round(sd.trailingPE.raw * 10) / 10 : null,
-        weekHigh52:    sd.fiftyTwoWeekHigh?.raw  || null,
-        weekLow52:     sd.fiftyTwoWeekLow?.raw   || null,
-        volume:        fmtVol(p.regularMarketVolume?.raw),
+        exchange,
+        price:         Math.round(price   * 100) / 100,
+        change:        Math.round(change  * 100) / 100,
+        changePercent: Math.round(chgPct  * 100) / 100,
+        marketCap:     null,       // not in Twelve Data free quote endpoint
+        peRatio:       null,       // not in Twelve Data free quote endpoint
+        weekHigh52:    high52,
+        weekLow52:     low52,
+        volume:        fmtVol(data.volume),
         description:   null,
       }));
     })();
