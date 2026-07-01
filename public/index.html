@@ -122,13 +122,17 @@ html, body {
 .logo-mark {
   width: 32px; height: 32px;
   background: var(--accent);
-  border-radius: 8px;
+  border-radius: 9px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 16px; font-weight: 800; color: var(--accent-fg);
   flex-shrink: 0;
+  color: var(--accent-fg);
 }
-.logo-text { color: var(--text); }
-.logo-text em { color: var(--accent); font-style: normal; }
+.logo-text {
+  color: var(--text);
+  font-family: var(--dm);
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
 .auth-sub { color: var(--text2); font-size: 13px; margin-bottom: 32px; line-height: 1.5; }
 .auth-tabs {
   display: flex;
@@ -909,12 +913,16 @@ html, body {
   <div class="auth-card">
     <div class="auth-logo">
       <div class="logo-mark">
-        <svg viewBox="0 0 24 24" width="62%" height="62%" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 16.5 L9 10.5 L13 14.5 L21 5.5"/>
-          <path d="M15.5 5.5 L21 5.5 L21 11"/>
+        <svg viewBox="0 0 24 24" width="58%" height="58%" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <!-- upper wick -->
+          <line x1="12" y1="2" x2="12" y2="6.5" stroke-width="1.8"/>
+          <!-- candle body: bullish filled bar -->
+          <rect x="7.5" y="6.5" width="9" height="11" rx="2" fill="currentColor" stroke="none"/>
+          <!-- lower wick -->
+          <line x1="12" y1="17.5" x2="12" y2="22" stroke-width="1.8"/>
         </svg>
       </div>
-      <div class="logo-text">intri<em>val</em></div>
+      <div class="logo-text">intrival</div>
     </div>
     <p class="auth-sub">US stock intelligence platform. Portfolio tracking, SEC filings, dividends, buybacks, and AI research — all in one place.</p>
     <div class="auth-tabs">
@@ -1010,12 +1018,16 @@ html, body {
   <nav class="sidebar" id="sidebar">
     <div class="sidebar-logo">
       <div class="logo-mark">
-        <svg viewBox="0 0 24 24" width="62%" height="62%" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 16.5 L9 10.5 L13 14.5 L21 5.5"/>
-          <path d="M15.5 5.5 L21 5.5 L21 11"/>
+        <svg viewBox="0 0 24 24" width="58%" height="58%" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <!-- upper wick -->
+          <line x1="12" y1="2" x2="12" y2="6.5" stroke-width="1.8"/>
+          <!-- candle body -->
+          <rect x="7.5" y="6.5" width="9" height="11" rx="2" fill="currentColor" stroke="none"/>
+          <!-- lower wick -->
+          <line x1="12" y1="17.5" x2="12" y2="22" stroke-width="1.8"/>
         </svg>
       </div>
-      <div class="logo-text">intri<em style="color:var(--accent);font-style:normal;">val</em></div>
+      <div class="logo-text">intrival</div>
     </div>
     <div class="nav-section">
       <div class="nav-section-label">Tools</div>
