@@ -208,6 +208,53 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ── GET /api/filings/:ticker → SEC EDGAR recent filings ──────────────
+  if (req.method === 'GET' && req.url.startsWith('/api/filings/')) {
+    const ticker = decodeURIComponent(req.url.replace('/api/filings/', '').split('?')[0]).toUpperCase();
+    const searchPath = `/LATEST/search-index?q=%22${encodeURIComponent(ticker)}%22&forms=10-K,10-Q,DEF+14A&dateRange=custom&startdt=2022-01-01`;
+    const fOpts = {
+      hostname: 'efts.sec.gov',
+      path: searchPath,
+      method: 'GET',
+      headers: { 'User-Agent': 'Intrival/1.0 avakash137@gmail.com', 'Accept': 'application/json' },
+    };
+    const fReq = https.request(fOpts, fRes => {
+      let d = '';
+      fRes.on('data', c => (d += c));
+      fRes.on('end', () => {
+        try {
+          const parsed = JSON.parse(d);
+          const hits = parsed?.hits?.hits || [];
+          const filings = hits.slice(0, 10).map(h => {
+            const src = h._source || {};
+            const id = h._id || '';
+            const url = id ? `https://www.sec.gov/Archives/${id}` : `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${encodeURIComponent(ticker)}&type=10-K&dateb=&owner=include&count=10`;
+            const formType = src.form_type || src.period_of_report || '10-K';
+            const date = src.file_date ? new Date(src.file_date).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) : '';
+            const period = src.period_of_report ? ` · Period: ${src.period_of_report}` : '';
+            return {
+              form: formType,
+              title: `${formType} — ${src.entity_name || ticker}`,
+              date: `Filed ${date}${period}`,
+              url,
+            };
+          });
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(filings));
+        } catch (e) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify([]));
+        }
+      });
+    });
+    fReq.on('error', () => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify([]));
+    });
+    fReq.end();
+    return;
+  }
+
   // ── GET /api/search?q=query → Yahoo Finance symbol search ─────────────
   if (req.method === 'GET' && req.url.startsWith('/api/search')) {
     const qs = new URLSearchParams(req.url.split('?')[1] || '');

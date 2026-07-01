@@ -33,8 +33,6 @@
   --loss-soft:    rgba(244,63,94,0.12);
   --warn:         #F59E0B;
   --warn-soft:    rgba(245,158,11,0.12);
-  --inr:          #FF9933;
-  --inr-soft:     rgba(255,153,51,0.12);
   --usd:          #4ADE80;
   --usd-soft:     rgba(74,222,128,0.12);
   --sidebar-w:    220px;
@@ -599,7 +597,6 @@ html, body {
 .tag-gain { background: var(--gain-soft); color: var(--gain); font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; font-family: var(--mono); }
 .tag-loss { background: var(--loss-soft); color: var(--loss); font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; font-family: var(--mono); }
 .tag-neu  { background: var(--surface2); color: var(--text2); font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; font-family: var(--mono); }
-.tag-inr  { background: var(--inr-soft); color: var(--inr); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; letter-spacing: 0.3px; }
 .tag-usd  { background: var(--usd-soft); color: var(--usd); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; letter-spacing: 0.3px; }
 .mono { font-family: var(--mono); }
 .muted { color: var(--text2); }
@@ -925,7 +922,7 @@ html, body {
       </div>
       <div class="logo-text">intri<em>val</em></div>
     </div>
-    <p class="auth-sub">Your complete investor intelligence platform. Portfolio tracking, SEC filings, market data, AI research — all in one place.</p>
+    <p class="auth-sub">US stock intelligence platform. Portfolio tracking, SEC filings, dividends, buybacks, and AI research — all in one place.</p>
     <div class="auth-tabs">
       <button class="auth-tab active" onclick="authTab('login')">Sign In</button>
       <button class="auth-tab" onclick="authTab('register')">Create Account</button>
@@ -998,41 +995,17 @@ html, body {
       <button class="btn-ghost" id="logout-btn" onclick="doLogout()" style="width:100%;border:1px solid var(--border);color:var(--loss);">Log Out</button>
     </div>
     <div id="ob-tab-prefs">
-    <div class="section-label">Preferred Currency</div>
-    <div class="currency-grid">
-      <label class="currency-opt selected" id="copt-inr">
-        <input type="radio" name="curr" value="INR" checked/>
-        <span class="curr-flag">🇮🇳</span>
-        <span class="curr-sym">₹ INR</span>
-        <span class="curr-name">Indian Rupee</span>
-      </label>
-      <label class="currency-opt" id="copt-usd">
-        <input type="radio" name="curr" value="USD"/>
-        <span class="curr-flag">🇺🇸</span>
-        <span class="curr-sym">$ USD</span>
-        <span class="curr-name">US Dollar</span>
-      </label>
-      <label class="currency-opt both-opt" id="copt-both">
-        <input type="radio" name="curr" value="BOTH"/>
-        <span class="curr-flag">🌐</span>
-        <div>
-          <span class="curr-sym" style="font-size:14px;">₹ + $</span>
-          <span class="curr-name">Track both INR & USD</span>
-        </div>
-      </label>
+    <div class="market-info" style="margin-bottom:20px;">
+      <strong>🇺🇸 NYSE / NASDAQ</strong> — US equities (AAPL, TSLA, GOOGL, NVDA, MSFT…)<br/>
+      All prices in <strong>USD ($)</strong>. Add any US-listed ticker to your portfolio to get started with AI-powered intelligence briefings, SEC filings, dividend tracking, and more.
     </div>
-    <div class="market-info">
-      <strong>NSE / BSE</strong> — Indian equities (RELIANCE, TCS, INFY, BEL, RVNL…)<br/>
-      <strong>NYSE / NASDAQ</strong> — US equities (AAPL, TSLA, GOOGL, NVDA…)<br/>
-      You can add stocks from either market to your portfolio and watchlist.
-    </div>
-    <div class="fgroup" style="margin-bottom:20px;">
-      <label>Home Market (for default views)</label>
-      <select id="home-market">
-        <option value="IN">India (NSE/BSE)</option>
-        <option value="US">United States (NYSE/NASDAQ)</option>
-        <option value="BOTH">Both</option>
-      </select>
+    <div class="metric-box" style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      <div style="font-size:28px;">🇺🇸</div>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:var(--text);">United States Markets</div>
+        <div style="font-size:12px;color:var(--text2);">Currency: USD ($) · NYSE &amp; NASDAQ</div>
+      </div>
+      <span class="tag-usd" style="margin-left:auto;">ACTIVE</span>
     </div>
     </div>
     <button class="btn-primary" id="ob-submit-btn" onclick="finishOnboarding()">Get Started →</button>
@@ -1101,6 +1074,9 @@ html, body {
     <div class="panel-tabs" id="panel-tabs">
       <button class="ptab active" onclick="panelTab('summary')">Summary</button>
       <button class="ptab" onclick="panelTab('filings')">10-K / 10-Q</button>
+      <button class="ptab" onclick="panelTab('dividends')">Dividends</button>
+      <button class="ptab" onclick="panelTab('buybacks')">Buybacks</button>
+      <button class="ptab" onclick="panelTab('trades')">Large Trades</button>
       <button class="ptab" onclick="panelTab('agm')">AGM</button>
       <button class="ptab" onclick="panelTab('news')">News</button>
     </div>
@@ -1119,7 +1095,7 @@ const sb = window.supabase.createClient(
 // STATE
 const S = {
   user: null,
-  prefs: { currency: 'INR', market: 'IN' },
+  prefs: { currency: 'USD', market: 'US' },
   portfolio: [],
   watchlist: [],
   cache: {},
@@ -1191,7 +1167,7 @@ async function bootApp(authUser, freshName) {
       name: S.user.name,
       portfolio: [],
       watchlist: [],
-      prefs: { currency: 'INR', market: 'IN', onboarded: false },
+      prefs: { currency: 'USD', market: 'US', onboarded: false },
     }).select().single();
     row = inserted;
   }
@@ -1236,8 +1212,6 @@ function showProfile() {
   document.getElementById('profile-header-email').textContent = S.user.email || '';
   document.getElementById('profile-name').value = S.user.name || '';
   document.getElementById('profile-email').value = S.user.email || '';
-  selectCurrencyOpt(S.prefs.currency || 'INR');
-  document.getElementById('home-market').value = S.prefs.market || 'IN';
   document.getElementById('ob-submit-btn').textContent = 'Save Changes';
   profileTab('account');
   document.getElementById('onboarding').style.display = 'flex';
@@ -1256,7 +1230,7 @@ async function doLogout() {
   S.user = null;
   S.portfolio = [];
   S.watchlist = [];
-  S.prefs = { currency: 'INR', market: 'IN', onboarded: false };
+  S.prefs = { currency: 'USD', market: 'US', onboarded: false };
   document.getElementById('onboarding').style.display = 'none';
   document.getElementById('app').classList.remove('ready');
   document.getElementById('auth-wrap').style.display = 'flex';
@@ -1270,9 +1244,7 @@ document.querySelectorAll('.currency-opt').forEach(opt => {
   });
 });
 function finishOnboarding() {
-  const curr = document.querySelector('input[name="curr"]:checked')?.value || 'INR';
-  const mkt = document.getElementById('home-market').value;
-  S.prefs = { currency: curr, market: mkt, onboarded: true };
+  S.prefs = { currency: 'USD', market: 'US', onboarded: true };
   if (profileMode) {
     const newName = document.getElementById('profile-name').value.trim();
     if (newName) S.user.name = newName;
@@ -1301,9 +1273,7 @@ function launchApp() {
   goPage('portfolio');
 }
 function updateCurrBadge() {
-  const m = S.prefs.market;
-  const mkt = m === 'IN' ? 'India' : m === 'US' ? 'US' : 'India + US';
-  document.getElementById('sb-meta').textContent = mkt;
+  document.getElementById('sb-meta').textContent = 'US Markets';
 }
 // NAVIGATION
 const PAGE_TITLES = {
@@ -1393,11 +1363,7 @@ async function getTickerData(ticker) {
     return { symbol: ticker, name: ticker, currency: 'USD', market: 'US', price: 0, error: true };
   }
 }
-function isLikelyIndian(sym) {
-  const indianSyms = ['RELIANCE','TCS','INFY','WIPRO','HDFCBANK','ICICIBANK','SBIN','BAJFINANCE','RVNL','BEL','HAL','BEML','IRFC','NTPC','POWERGRID','COALINDIA','ONGC','LT','MARUTI','TITAN'];
-  return indianSyms.includes(sym.toUpperCase()) || sym.endsWith('.NS') || sym.endsWith('.BO');
-}
-function currSymbol(currency) { return currency === 'INR' ? '₹' : '$'; }
+function currSymbol(currency) { return '$'; }
 // PAGE: PORTFOLIO
 function renderPortfolioPage() {
   return `
@@ -1472,12 +1438,9 @@ async function renderTickerGrid(listKey, gridId) {
     el('name').textContent = data.name || t;
     const card = document.getElementById(`tc-${t}`);
     if (card) {
-      const badge = data.market === 'IN'
-        ? '<span class="tag-inr" style="position:absolute;top:14px;right:14px;">NSE</span>'
-        : '<span class="tag-usd" style="position:absolute;top:14px;right:14px;">NYSE</span>';
-      card.insertAdjacentHTML('afterbegin', badge);
+      card.insertAdjacentHTML('afterbegin', '<span class="tag-usd" style="position:absolute;top:14px;right:14px;">NYSE</span>');
     }
-    el('price').textContent = data.price ? `${sym}${data.price.toLocaleString('en-IN', {maximumFractionDigits:2})}` : '—';
+    el('price').textContent = data.price ? `${sym}${data.price.toLocaleString('en-US', {maximumFractionDigits:2})}` : '—';
     const chg = data.changePercent || 0;
     const sign = chg >= 0 ? '+' : '';
     el('chg').textContent = `${sign}${chg.toFixed(2)}%`;
@@ -1558,7 +1521,7 @@ async function openPanel(ticker) {
   const data = S.cache[`td_${ticker}`]?.data || {};
   document.getElementById('phd-sym').textContent = ticker;
   document.getElementById('phd-co').textContent = data.name || ticker;
-  const badge = data.market === 'IN' ? '<span class="tag-inr">NSE/BSE</span>' : '<span class="tag-usd">NYSE/NASDAQ</span>';
+  const badge = '<span class="tag-usd">NYSE/NASDAQ</span>';
   document.getElementById('phd-badge').innerHTML = badge;
   document.getElementById('panel-overlay').style.display = 'flex';
   document.body.style.overflow = 'hidden';
@@ -1618,16 +1581,156 @@ async function renderPanelTab(tab) {
     }
   }
   else if (tab === 'filings') {
-    const filingBourse = td.market === 'IN' ? 'BSE/MCA filings' : 'SEC EDGAR filings';
     body.innerHTML = `
-      <p class="section-label">${filingBourse}</p>
-      <div id="filing-list">
-        ${docRow('Annual Report', td.market==='IN'?'Annual Report FY2024':'10-K Annual Report 2024', 'Filed Feb 2024', ticker, 'annual')}
-        ${docRow(td.market==='IN'?'Quarterly':'10-Q', td.market==='IN'?'Q3 FY2024 Results':'Q3 2024 10-Q', 'Filed Nov 2024', ticker, 'q3')}
-        ${docRow(td.market==='IN'?'Quarterly':'10-Q', td.market==='IN'?'Q2 FY2024 Results':'Q2 2024 10-Q', 'Filed Aug 2024', ticker, 'q2')}
-        ${docRow(td.market==='IN'?'Quarterly':'10-Q', td.market==='IN'?'Q1 FY2024 Results':'Q1 2024 10-Q', 'Filed May 2024', ticker, 'q1')}
+      <p class="section-label">SEC EDGAR Filings</p>
+      <div id="filing-list"><div class="loading-row"><span class="spin"></span> Fetching SEC filings for ${ticker}…</div></div>
+      <div id="filing-viewer" style="display:none;margin-top:16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <span class="section-label" id="viewer-title" style="margin:0;"></span>
+          <button class="btn-ghost" style="font-size:11px;" onclick="document.getElementById('filing-viewer').style.display='none';">✕ Close</button>
+        </div>
+        <iframe id="filing-iframe" style="width:100%;height:70vh;border:1px solid var(--border);border-radius:var(--radius);background:#fff;" src=""></iframe>
       </div>
       <div id="filing-detail"></div>`;
+    try {
+      const res = await fetch(`/api/filings/${encodeURIComponent(ticker)}`);
+      const filings = res.ok ? await res.json() : null;
+      const fl = document.getElementById('filing-list');
+      if (fl) {
+        if (filings?.length) {
+          fl.innerHTML = filings.map(f => `<div class="doc-row">
+            <span class="doc-type-tag">${f.form}</span>
+            <div class="doc-info"><div class="doc-title">${f.title}</div><div class="doc-date">${f.date}</div></div>
+            <div class="doc-btns">
+              <button class="btn-soft" onclick="showFilingInline('${f.url}','${f.form} — ${ticker}','${ticker}','${f.form}')">View Inline</button>
+              <button class="btn-ghost" onclick="showFilingSummary('${ticker}','${f.form}','${f.title}')">AI Summary</button>
+            </div>
+          </div>`).join('');
+        } else {
+          fl.innerHTML = `<p class="muted small" style="padding:8px 0;">No recent filings found on SEC EDGAR for <strong>${ticker}</strong>. The ticker may differ from the SEC CIK lookup. Try searching on <a href="https://www.sec.gov/cgi-bin/browse-edgar?company=${ticker}&action=getcompany" target="_blank" style="color:var(--accent);">EDGAR directly</a>.</p>`;
+        }
+      }
+    } catch(e) {
+      const fl = document.getElementById('filing-list');
+      if (fl) fl.innerHTML = '<p class="muted small">Could not load filings.</p>';
+    }
+  }
+  else if (tab === 'dividends') {
+    body.innerHTML = `
+      <div class="ai-box" style="margin-bottom:16px;">
+        <div class="ai-box-hd"><span class="ai-label">AI POWERED</span><span class="ai-box-title">Dividend Intelligence — ${td.name||ticker}</span></div>
+        <div class="ai-text" id="div-ai"><div class="loading-row"><span class="spin"></span> Analysing dividend history…</div></div>
+      </div>
+      <p class="section-label">Upcoming Dividend Dates</p>
+      <div id="div-dates"><div class="loading-row"><span class="spin"></span> Loading…</div></div>`;
+    const divKey = `div_${ticker}`;
+    const divCached = S.cache[divKey];
+    let divData = (divCached && Date.now() - divCached.ts < 86400000) ? divCached.data : null;
+    if (!divData) {
+      divData = await claudeJSON(`You are a financial data analyst. Return dividend data for ${td.name||ticker} (${ticker}), a US-listed company. Return a JSON object with two keys:
+"summary": a 2-paragraph plain-prose analysis of the company's dividend track record, yield, payout ratio, growth history, and outlook.
+"dates": an array of 4 objects each with keys: "label" (e.g. "Ex-Dividend Date"), "date" (e.g. "Aug 14, 2025"), "detail" (e.g. "$0.25/share · Quarterly").
+If the company does not pay dividends, set "dates" to [] and explain in the summary.
+Return ONLY valid JSON.`);
+      if (divData) { S.cache[divKey] = { data: divData, ts: Date.now() }; localStorage.setItem('iv_cache', JSON.stringify(S.cache)); }
+    }
+    const aiEl = document.getElementById('div-ai');
+    const datesEl = document.getElementById('div-dates');
+    if (aiEl) {
+      if (divData?.summary) {
+        aiEl.innerHTML = divData.summary.split('\n\n').filter(p=>p.trim()).map(p=>`<p>${p}</p>`).join('') || `<p>${divData.summary}</p>`;
+      } else {
+        aiEl.innerHTML = '<p style="color:var(--text3);font-style:italic;">Dividend data unavailable. Please try again.</p>';
+      }
+    }
+    if (datesEl) {
+      if (divData?.dates?.length) {
+        datesEl.innerHTML = divData.dates.map(d=>`<div class="doc-row" style="align-items:flex-start;">
+          <span class="doc-type-tag" style="background:var(--gain-soft);color:var(--gain);border-color:rgba(16,185,129,0.25);">${d.label}</span>
+          <div class="doc-info"><div class="doc-title">${d.date}</div><div class="doc-date">${d.detail}</div></div>
+        </div>`).join('');
+      } else {
+        datesEl.innerHTML = '<p class="muted small" style="padding:8px 0;">No upcoming dividend dates — this company may not currently pay dividends.</p>';
+      }
+    }
+  }
+  else if (tab === 'buybacks') {
+    body.innerHTML = `
+      <div class="ai-box" style="margin-bottom:16px;">
+        <div class="ai-box-hd"><span class="ai-label">AI POWERED</span><span class="ai-box-title">Share Buyback Program — ${td.name||ticker}</span></div>
+        <div class="ai-text" id="bb-ai"><div class="loading-row"><span class="spin"></span> Analysing buyback program…</div></div>
+      </div>
+      <p class="section-label">Buyback Activity</p>
+      <div id="bb-cards"><div class="loading-row"><span class="spin"></span> Loading…</div></div>`;
+    const bbKey = `bb_${ticker}`;
+    const bbCached = S.cache[bbKey];
+    let bbData = (bbCached && Date.now() - bbCached.ts < 86400000) ? bbCached.data : null;
+    if (!bbData) {
+      bbData = await claudeJSON(`You are a financial analyst. Return share buyback data for ${td.name||ticker} (${ticker}), a US-listed company. Return a JSON object with two keys:
+"summary": 2-paragraph plain-prose analysis of the company's share repurchase history, current authorised program size, pace of buybacks, EPS impact, and management commentary.
+"metrics": array of 4 objects each with keys: "label" (e.g. "Program Size"), "value" (e.g. "$90B authorised"), "sub" (brief context).
+Return ONLY valid JSON.`);
+      if (bbData) { S.cache[bbKey] = { data: bbData, ts: Date.now() }; localStorage.setItem('iv_cache', JSON.stringify(S.cache)); }
+    }
+    const aiEl = document.getElementById('bb-ai');
+    const cardsEl = document.getElementById('bb-cards');
+    if (aiEl) {
+      if (bbData?.summary) {
+        aiEl.innerHTML = bbData.summary.split('\n\n').filter(p=>p.trim()).map(p=>`<p>${p}</p>`).join('') || `<p>${bbData.summary}</p>`;
+      } else {
+        aiEl.innerHTML = '<p style="color:var(--text3);font-style:italic;">Buyback data unavailable. Please try again.</p>';
+      }
+    }
+    if (cardsEl && bbData?.metrics?.length) {
+      cardsEl.innerHTML = `<div class="grid-2">${bbData.metrics.map(m=>`<div class="metric-box"><div class="mb-label">${m.label}</div><div class="mb-val" style="font-size:15px;">${m.value}</div><div class="mb-sub">${m.sub||''}</div></div>`).join('')}</div>`;
+    } else if (cardsEl) {
+      cardsEl.innerHTML = '<p class="muted small" style="padding:8px 0;">No active buyback program data found.</p>';
+    }
+  }
+  else if (tab === 'trades') {
+    body.innerHTML = `
+      <div class="ai-box" style="margin-bottom:16px;">
+        <div class="ai-box-hd"><span class="ai-label">AI POWERED</span><span class="ai-box-title">Institutional &amp; Insider Activity — ${td.name||ticker}</span></div>
+        <div class="ai-text" id="tr-ai"><div class="loading-row"><span class="spin"></span> Analysing large trades…</div></div>
+      </div>
+      <p class="section-label">Recent Large Transactions</p>
+      <div id="tr-list"><div class="loading-row"><span class="spin"></span> Loading…</div></div>`;
+    const trKey = `tr_${ticker}`;
+    const trCached = S.cache[trKey];
+    let trData = (trCached && Date.now() - trCached.ts < 86400000) ? trCached.data : null;
+    if (!trData) {
+      trData = await claudeJSON(`You are a financial analyst. Return large trade and institutional activity data for ${td.name||ticker} (${ticker}), a US-listed company. Return a JSON object with two keys:
+"summary": 2-paragraph plain-prose analysis covering recent institutional ownership changes, notable insider buys/sells, and what the net activity signals about market sentiment.
+"trades": array of 6 objects each with keys: "actor" (e.g. "Vanguard Group" or "CEO John Smith"), "type" (must be "BUY", "SELL", or "HOLD"), "size" (e.g. "2.4M shares / $458M"), "date" (e.g. "Jun 2025"), "note" (one-line context).
+Return ONLY valid JSON.`);
+      if (trData) { S.cache[trKey] = { data: trData, ts: Date.now() }; localStorage.setItem('iv_cache', JSON.stringify(S.cache)); }
+    }
+    const aiEl = document.getElementById('tr-ai');
+    const listEl = document.getElementById('tr-list');
+    if (aiEl) {
+      if (trData?.summary) {
+        aiEl.innerHTML = trData.summary.split('\n\n').filter(p=>p.trim()).map(p=>`<p>${p}</p>`).join('') || `<p>${trData.summary}</p>`;
+      } else {
+        aiEl.innerHTML = '<p style="color:var(--text3);font-style:italic;">Trade data unavailable. Please try again.</p>';
+      }
+    }
+    if (listEl && trData?.trades?.length) {
+      listEl.innerHTML = trData.trades.map(t=>{
+        const isBuy = t.type==='BUY', isSell = t.type==='SELL';
+        const color = isBuy ? 'var(--gain)' : isSell ? 'var(--loss)' : 'var(--text2)';
+        const bg = isBuy ? 'var(--gain-soft)' : isSell ? 'var(--loss-soft)' : 'var(--surface2)';
+        return `<div class="doc-row">
+          <span class="doc-type-tag" style="background:${bg};color:${color};border-color:${color}33;">${t.type}</span>
+          <div class="doc-info">
+            <div class="doc-title">${t.actor}</div>
+            <div class="doc-date">${t.size} · ${t.date}</div>
+            <div class="doc-date" style="color:var(--text2);">${t.note}</div>
+          </div>
+        </div>`;
+      }).join('');
+    } else if (listEl) {
+      listEl.innerHTML = '<p class="muted small" style="padding:8px 0;">No significant trade activity found.</p>';
+    }
   }
   else if (tab === 'agm') {
     body.innerHTML = `
@@ -1699,20 +1802,24 @@ async function showFilingSummary(ticker, type, title) {
   const key = `fil_${ticker}_${type}`;
   let summary = S.cache[key]?.text;
   if (!summary) {
-    const mktCtx = td.market === 'IN' ? 'Indian listed company (NSE/BSE)' : 'US listed company (SEC filing)';
-    summary = await claude(`You are a financial analyst. Write a detailed summary of the most recent ${type} for ${td.name||ticker} (${ticker}), a ${mktCtx}. Cover: revenue trends, operating metrics, management commentary highlights, key risks disclosed. 4 paragraphs, specific with numbers. Plain paragraphs, no bullets.`);
+    summary = await claude(`You are a financial analyst. Write a detailed summary of the most recent ${type} for ${td.name||ticker} (${ticker}), a US-listed company (SEC filing). Cover: revenue trends, operating metrics, management commentary highlights, key risks disclosed. 4 paragraphs, specific with numbers. Plain paragraphs, no bullets.`);
     S.cache[key] = { text: summary, ts: Date.now() };
     localStorage.setItem('iv_cache', JSON.stringify(S.cache));
   }
   const el = document.getElementById('filing-ai');
   if (el) el.innerHTML = summary.split('\n\n').filter(p=>p.trim()).map(p=>`<p>${p}</p>`).join('');
 }
-function openSEC(ticker, type) {
-  // Normalise display type names → SEC filing types
-  const typeMap = { 'Annual Report': '10-K', 'ANNUAL': '10-K', 'Quarterly': '10-Q', '10-Q': '10-Q', '10-K': '10-K', 'PROXY': 'DEF 14A', 'ANNUAL': '10-K' };
-  const secType = typeMap[type] || '10-K';
-  const url = `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${encodeURIComponent(ticker)}&type=${encodeURIComponent(secType)}&dateb=&owner=include&count=10&search_text=`;
-  window.open(url, '_blank');
+function showFilingInline(url, title, ticker, form) {
+  const viewer = document.getElementById('filing-viewer');
+  const iframe = document.getElementById('filing-iframe');
+  const titleEl = document.getElementById('viewer-title');
+  if (!viewer || !iframe) return;
+  titleEl.textContent = title;
+  iframe.src = url;
+  viewer.style.display = 'block';
+  viewer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // Also trigger AI summary
+  showFilingSummary(ticker, form, title);
 }
 // PAGE: MARKET PULSE
 function renderMarketPage() {
